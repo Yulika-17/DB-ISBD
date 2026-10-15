@@ -7,7 +7,7 @@
 | Этап | Описание | Статус |
 |------|----------|--------|
 | 1 | Интерфейсы и скелет | ✅ |
-| 2 | In-memory реализация | ⬜ |
+| 2 | In-memory реализация, персистентность, локальная консоль | ✅ |
 | 3 | REST-сервер | ⬜ |
 | 4 | Репликация | ⬜ |
 | 5 | Шардирование | ⬜ |
@@ -26,6 +26,55 @@ chmod +x mvnw   # если ещё не делали
 bash mvnw clean compile
 bash mvnw test
 ```
+
+## Запуск локальной БД
+
+После `compile` классы лежат в `target/classes`:
+
+```bash
+java -cp target/classes com.db.Main                          # данные в ./data, автосохранение раз в 5 сек
+java -cp target/classes com.db.Main --data ./mydata --save-interval 10
+java -cp target/classes com.db.Main --no-autosave            # только SAVE вручную и при выходе
+java -cp target/classes com.db.Main < script.txt             # выполнить команды из файла
+```
+
+Пример сессии:
+
+```
+vecdb> CREATE_COLLECTION docs 3 COSINE
+docs (dimension=3, metric=COSINE, maxVectors=unlimited)
+vecdb> PUT docs a 1 0 0 первый документ
+OK
+vecdb> PUT docs c 0.9 0.1 0
+OK
+vecdb> SEARCH docs 1 0 0 2
+1) distance=0.000000  id=a vector=[1.0, 0.0, 0.0] data="первый документ"
+2) distance=0.006116  id=c vector=[0.9, 0.1, 0.0]
+vecdb> STATS
+engine=in-memory/brute-force collections=1 vectors=2 puts=2 searches=1 hitRatio=0.00 evicted=0 lastSave=never (0 ms)
+  docs: dimension=3 metric=COSINE vectors=2 puts=2 searches=1 hits=0 misses=0 hitRatio=0.00 evicted=0
+vecdb> EXIT
+bye
+```
+
+При выходе (`EXIT`, конец ввода или Ctrl+C) изменения сохраняются на диск; при следующем запуске коллекции загружаются автоматически.
+
+### Команды
+
+| Команда | Описание |
+|---------|----------|
+| `CREATE_COLLECTION <name> <dim> [COSINE\|EUCLIDEAN\|DOT_PRODUCT] [maxVectors]` | Создать коллекцию |
+| `DROP_COLLECTION <name>` | Удалить коллекцию вместе с файлами |
+| `LIST_COLLECTIONS`, `DESCRIBE <name>` | Список коллекций / схема коллекции |
+| `PUT <coll> <id> <v1> … <vN> [payload…]` | Вставить/перезаписать; N = размерность коллекции, остаток строки — payload (UTF-8) |
+| `GET <coll> <id>`, `EXISTS <coll> <id>`, `DELETE <coll> <id>` | Операции по id |
+| `SIZE <coll>`, `CLEAR <coll>` | Размер / очистка коллекции |
+| `SEARCH <coll> <v1> … <vN> <k>` | k ближайших соседей |
+| `STATS [coll]` | Статистика БД или коллекции |
+| `SAVE`, `LOAD` | Сохранить изменения / перечитать с диска (несохранённое теряется) |
+| `HELP`, `EXIT` | Справка / выход |
+
+Регистр команд не важен, строки с `#` — комментарии.
 
 
 ## Теоретические основы
@@ -59,14 +108,14 @@ bash mvnw test
                     └──────────────────┬──────────────────┘
                                        │ createCollection / getCollection
                     ┌──────────────────▼──────────────────┐
-                    │        ICollection  (N штук)        │  ← этап 2
+                    │        ICollection  (N штук)        │
                     │      IRamDB + INearestSearch        │
                     │ CollectionConfig: name, dimension,  │
                     │            metric, maxVectors       │
                     └──────┬───────────────┬──────────────┘
                            │               │
               ┌────────────▼────┐   ┌──────▼──────────┐
-              │  Map<id, Entry> │   │     IIndex      │  ← k-NN (этап 2)
+              │  Map<id, Entry> │   │     IIndex      │  ← k-NN
               │   (хранилище)   │   │  getNearest(k)  │
               └─────────────────┘   └─────────────────┘
 ```
@@ -81,7 +130,7 @@ public interface IVectorDB
 Единая точка входа: жизненный цикл, управление коллекциями, сохранение на диск. Работа с векторами — через `ICollection`:
 
 ```java
-try (IVectorDB db = new InMemoryVectorDB(DbConfig.builder().dataDirectory("./data").build())) {
+try (IVectorDB db = InMemoryVectorDB.open(DbConfig.builder().dataDirectory("./data").build())) {
     ICollection docs = db.createCollection("docs", 384, DistanceMetric.COSINE);
     docs.put(new VectorEntry("doc-1", embedding, payload));
     List<SearchResult> top5 = docs.getNearest(query, 5);
@@ -114,7 +163,7 @@ try (IVectorDB db = new InMemoryVectorDB(DbConfig.builder().dataDirectory("./dat
 | `IRamDB` | `put`, `getById`, `delete`, `exists`, `size`, `clear` | Классический key-value слой поверх векторов |
 | `INearestSearch` | `getNearest(query, k)` | Главная векторная операция, отделена от CRUD |
 | `IPersistable` | `save`, `load`, `flush` | Отделяет работу с данными в RAM от записи/чтения с носителя. Персистентность можно подменить (файл, WAL) без смены API. |
-| `IIndex` | Индекс для k-NN: `add`, `remove`, `getNearest` | Brute-force или HNSW/LSH на этап 2; один экземпляр на коллекцию |
+| `IIndex` | Индекс для k-NN: `add`, `remove`, `getNearest` | Сейчас `BruteForceIndex`; можно заменить на HNSW/LSH без смены API; один экземпляр на коллекцию |
 | `ICommandDispatcher` | `dispatch(List<String>)` | Текстовый протокол для REST (этап 3): `PUT docs id 1 2 3`, `SEARCH docs 1 2 3 5` |
 
 Для `IPersistable`:
@@ -127,14 +176,54 @@ flush() - синхронный сброс (save() без checked exception)
 ```
 data/
 ├── docs/
-│   ├── meta.json      # {"formatVersion": 1, "name": "docs", "dimension": 384, "metric": "COSINE", "maxVectors": 0}
-│   └── vectors.bin    # записи коллекции
+│   ├── meta.properties   # formatVersion=1, name, dimension, metric, maxVectors
+│   └── vectors.bin       # записи коллекции + CRC32
 └── images/
-    ├── meta.json
+    ├── meta.properties
     └── vectors.bin
 ```
 
-`load()` сканирует `dataDirectory`, читает `meta.json` каждой подпапки и поднимает коллекцию с её схемой. `formatVersion` заложен с первого дня, чтобы будущие изменения формата шли через явную миграцию.
+`load()` сканирует `dataDirectory`, читает `meta.properties` каждой подпапки и поднимает коллекцию с её схемой. Каталоги без `meta.properties` игнорируются. `formatVersion` заложен с первого дня: файл с другой версией не загружается молча, а даёт `StorageException`.
+
+Формат `vectors.bin` (big-endian, `DataOutputStream`):
+
+```
+int    MAGIC "VDB1"
+int    formatVersion
+int    dimension
+int    count
+count × { int idLen, byte[] id (UTF-8), double[dimension] vector, int dataLen (-1 = null), byte[] data }
+long   CRC32 всего, что выше
+```
+
+Надёжность записи: каждый файл пишется во временный `*.tmp`, сбрасывается на диск (`fsync`) и атомарно переименовывается. Если процесс упадёт посреди сохранения, предыдущая версия останется целой. Повреждённый или обрезанный файл распознаётся по CRC32 / EOF при загрузке.
+
+
+## Реализация (этап 2)
+
+```
+com.db
+├── Main                         локальная консоль (REPL)
+├── index/BruteForceIndex        IIndex: точный k-NN перебором, top-k через кучу — O(n·d + n·log k)
+├── storage/
+│   ├── InMemoryVectorDB         IVectorDB: коллекции, save/load, автосохранение, close
+│   ├── InMemoryCollection       ICollection: хранилище + индекс, блокировки, статистика, вытеснение
+│   └── CollectionFileStore      файловый формат (meta.properties + vectors.bin)
+└── command/
+    ├── TextCommandDispatcher    ICommandDispatcher: текстовые команды → вызовы IVectorDB
+    └── ResponseFormatter        результат → человекочитаемый текст
+```
+
+| Решение | Как сделано | Почему |
+|---------|-------------|--------|
+| Хранилище и индекс | `LinkedHashMap<id, entry>` + `BruteForceIndex`, обновляются вместе под одной блокировкой | Поиск никогда не видит запись, которой нет в хранилище, и наоборот |
+| Конкурентность | `ReentrantReadWriteLock` на коллекцию: get/exists/search параллельно, put/delete/clear эксклюзивно. На уровне БД — `schemaLock` (create/drop/load/close vs save) и `saveLock` (ручной save vs автосохранение) | Операции в разных коллекциях не блокируют друг друга |
+| Неизменяемость данных | Записи копируются при `put` и при выдаче (`get`, `search`) | `VectorEntry` — record с массивами; без копий клиент мог бы изменить вектор в БД в обход индекса |
+| Валидация | Размерность, конечные значения (`NaN`/`Infinity` отклоняются), непустой id, `k ≥ 1` | Ошибка возникает при вставке, а не при поиске |
+| `maxVectors` | При переполнении вытесняется самая старая запись (FIFO), перезапись id делает запись «новой»; счётчик `evictedVectors` | Предсказуемое поведение без настроек |
+| Сохранение | Пишутся только изменённые коллекции (по номеру версии коллекции) | Автосохранение не переписывает неизменённые данные |
+| Автосохранение | Фоновый daemon-поток раз в `saveInterval`; `close()` останавливает его и делает финальный `save()` | Ограничивает потерю данных при сбое интервалом сохранения |
+| Жизненный цикл | `InMemoryVectorDB.open(config)` создаёт каталог и загружает данные; после `close()` любые вызовы (в т.ч. через старые ссылки на коллекции) → `DatabaseClosedException`; ссылка на удалённую коллекцию → `CollectionNotFoundException` | Явные ошибки вместо тихой работы с «мертвыми» объектами |
 
 
 ## Модель данных
@@ -185,8 +274,10 @@ record SearchResult(VectorEntry entry, double distance)
 
 | Параметр | По умолчанию | Назначение |
 |----------|--------------|------------|
+| `name` | `vecdb` | Имя инстанса (`IDatabase.name()`) |
 | `dataDirectory` | `./data` | Каталог для save/load; коллекция лежит в `dataDirectory/<name>` (`collectionPath(name)`) |
-| `saveInterval` | 5 сек | Период автосохранения (этап 2) |
+| `autoSave` | `true` | Фоновое сохранение изменённых коллекций |
+| `saveInterval` | 5 сек | Период автосохранения |
 
 ### `CollectionConfig` — схема коллекции (record, неизменяемый)
 
@@ -215,37 +306,30 @@ CollectionConfig images = CollectionConfig.of("images", 512, DistanceMetric.EUCL
 - `DimensionMismatchException` — вектор не совпадает по размерности со схемой коллекции
 - `IdNotFoundException`, `InvalidIdException` — ошибки идентификатора
 - `CollectionNotFoundException`, `CollectionAlreadyExistsException`, `InvalidCollectionNameException` — ошибки уровня коллекций
+- `DatabaseClosedException` — обращение к закрытой БД
 
 
 ## Тестирование
 
-`VectorStoreContractTest` — абстрактный набор тестов для любой реализации `IVectorDB` / `ICollection`:
+`bash mvnw test` (или `mvn test`):
 
-- CRUD: put, get, delete, overwrite, clear
-- k-NN: ближайший сосед, ограничение k, пустая база
-- валидация: пустой id, неверная размерность в `put` и `getNearest`
-- коллекции: create / get / drop / list, повторное создание, несуществующая коллекция, недопустимое имя, изоляция данных между коллекциями
+| Тест | Что проверяет |
+|------|---------------|
+| `VectorStoreContractTest` | Абстрактный контракт любой `ICollection`: CRUD, перезапись, k-NN (порядок, `k`, пустая коллекция, удалённые записи), валидация (размерность, NaN, пустой id, `k < 1`), статистика |
+| `InMemoryCollectionTest` | Наследует контракт + защитные копии массивов, FIFO-вытеснение, версия изменений, многопоточные put/search/delete |
+| `InMemoryVectorDBTest` | Коллекции (create/get/list/drop, изоляция, «мертвые» ссылки), сохранение и повторное открытие, сохранение при `close()`, удаление файлов при drop, `load()`, пропуск неизменённых коллекций, повреждённый и обрезанный файл, чужая `formatVersion`, автосохранение, закрытая БД |
+| `BruteForceIndexTest` | Порядок и `k`, равные расстояния, сверка с полной сортировкой на случайных данных для всех метрик |
+| `TextCommandDispatcherTest` | Сценарий команд от создания до удаления, ошибки синтаксиса, форматирование ответов |
+| `DistanceFunctionsTest` | Значения метрик и разная длина векторов |
 
-На этапе 2 достаточно создать класс вида `class InMemoryVectorDBTest extends VectorStoreContractTest` с методом `createStore()` — и весь контракт проверится автоматически.
+Новая реализация коллекции получает весь контракт, если унаследовать `VectorStoreContractTest` и реализовать `createStore(CollectionConfig)`.
 
 
 ## План развития по этапам
 
-### Этап 2 — реализация
+### Этап 2 — реализация ✅
 
-```
-InMemoryVectorDB implements IVectorDB
-├── ConcurrentHashMap<String, InMemoryCollection> collections
-├── create/get/drop/list коллекций
-└── save/load: dataDirectory/<name>/meta.json + vectors.bin
-
-InMemoryCollection implements ICollection
-├── HashMap<String, VectorEntry> storage
-├── BruteForceIndex implements IIndex (метрика из CollectionConfig)
-├── синхронизация storage и index при put/delete
-├── проверка размерности и maxVectors из CollectionConfig
-└── ReadWriteLock на коллекцию
-```
+См. раздел «Реализация (этап 2)» выше.
 
 ### Этап 3 — REST
 
