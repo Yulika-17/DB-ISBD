@@ -1,10 +1,12 @@
 package com.db;
 
+import com.db.config.CollectionConfig;
 import com.db.config.DbConfig;
 import com.db.config.DistanceMetric;
 import com.db.model.VectorEntry;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 public final class Main {
 
@@ -14,18 +16,23 @@ public final class Main {
     public static void main(String[] args) {
         DbConfig config = DbConfig.builder()
                 .dataDirectory("./data")
-                .dimension(4)
+                .saveInterval(Duration.ofSeconds(5))
+                .build();
+
+        CollectionConfig docs = CollectionConfig.builder("docs", 4)
                 .metric(DistanceMetric.COSINE)
                 .maxVectors(100_000)
-                .saveInterval(java.time.Duration.ofSeconds(5))
                 .build();
 
         System.out.println("lab-db skeleton (vector)");
         System.out.println("  dataDirectory : " + config.dataDirectory());
-        System.out.println("  dimension     : " + config.dimension());
-        System.out.println("  metric        : " + config.metric());
-        System.out.println("  maxVectors    : " + config.maxVectors());
         System.out.println("  saveInterval  : " + config.saveInterval());
+        System.out.println();
+        System.out.println("Collection '" + docs.name() + "':");
+        System.out.println("  path       : " + config.collectionPath(docs.name()));
+        System.out.println("  dimension  : " + docs.dimension());
+        System.out.println("  metric     : " + docs.metric());
+        System.out.println("  maxVectors : " + docs.maxVectors());
 
         VectorEntry example = new VectorEntry(
                 "example-1",
