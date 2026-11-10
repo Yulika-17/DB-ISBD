@@ -8,9 +8,15 @@
 |------|----------|--------|
 | 1 | Интерфейсы и скелет | ✅ |
 | 2 | In-memory реализация, персистентность, локальная консоль | ✅ |
-| 3 | REST-сервер | ⬜ |
+| 3 | REST-сервер, OpenAPI/Swagger, Docker | ✅ |
 | 4 | Репликация | ⬜ |
 | 5 | Шардирование | ⬜ |
+
+## Требования
+
+- Java 21 — для локальной сборки и запуска
+- Docker с Docker Compose — для запуска в контейнере
+- Доступ к Maven Central и Microsoft Container Registry — для первой сборки
 
 ## Сборка
 
@@ -76,6 +82,49 @@ bye
 
 Регистр команд не важен, строки с `#` — комментарии.
 
+## REST-сервер (этап 3)
+
+Сервер запускается на порту `2222` и использует реализацию `IVectorDB` из второй лабораторной:
+
+```bash
+bash mvnw spring-boot:run
+```
+
+После сборки сервер можно запустить как исполняемый JAR:
+
+```bash
+bash mvnw clean package
+java -jar target/lab-db-0.0.1-SNAPSHOT.jar
+```
+
+Swagger UI доступен по адресу `http://localhost:2222/swagger-ui.html`, OpenAPI JSON — `http://localhost:2222/v3/api-docs`.
+
+Основные маршруты:
+
+| Метод и путь | Операция |
+|--------------|----------|
+| `GET /api/v1/health` | Состояние сервера |
+| `GET /api/v1/stats` | Статистика БД |
+| `POST /api/v1/save`, `POST /api/v1/load` | Сохранение и загрузка |
+| `POST /api/v1/collections` | Создание коллекции с заданной размерностью |
+| `GET /api/v1/collections` | Список коллекций |
+| `GET`, `DELETE /api/v1/collections/{name}` | Получение и удаление коллекции |
+| `GET /api/v1/collections/{name}/stats` | Статистика коллекции, включая количество векторов |
+| `PUT`, `GET`, `DELETE /api/v1/collections/{name}/vectors/{id}` | CRUD вектора |
+| `POST /api/v1/collections/{name}/vectors/search` | k-NN поиск |
+
+REST API остаётся stateless: имя коллекции передаётся в пути каждого запроса (`/collections/{name}/...`), состояния `USE` на сервере нет.
+
+Настройки сервера задаются переменными окружения `SERVER_PORT`, `SERVER_ADDRESS`, `VECDB_NAME`, `VECDB_DATA_DIRECTORY`, `VECDB_AUTO_SAVE` и `VECDB_SAVE_INTERVAL`.
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Порт `2222` публикуется на хосте, а данные сохраняются в именованном томе `vecdb-data`. Остановка выполняется через `docker compose down`; том с данными при этом остаётся.
+
 
 ## Теоретические основы
 
@@ -86,7 +135,7 @@ bye
 | **Базовые** | CRUD по id, размер, очистка, закрытие, статистика | `IRamDB`, `IDatabase` |
 | **Коллекции** | Создание/удаление/список коллекций, схема (размерность + метрика) на коллекцию | `ICollectionManager`, `ICollection`, `CollectionConfig` |
 | **Отличительные** | k-NN поиск, метрики расстояния, фиксированная размерность | `INearestSearch`, `IIndex`, `DistanceMetric`, `DistanceFunctions` |
-| **Расширения** | Персистентность, REST-команды, репликация, шарды | `IPersistable`, `ICommandDispatcher`, конфиг |
+| **Расширения** | Персистентность, REST API, репликация, шарды | `IPersistable`, REST-контроллеры, конфиг |
 
 
 ## Архитектура
@@ -96,8 +145,8 @@ bye
 
 ```
                     ┌─────────────────────────────────────┐
-                    │           ICommandDispatcher        │  ← этап 3 (REST)
-                    │     dispatch(List<String> command)  │
+                    │ REST controllers / Swagger (2222)   │  ← этап 3
+                    │ collection, vector, search endpoints│
                     └──────────────────┬──────────────────┘
                                        │ вызывает
                     ┌──────────────────▼──────────────────┐
@@ -164,7 +213,7 @@ try (IVectorDB db = InMemoryVectorDB.open(DbConfig.builder().dataDirectory("./da
 | `INearestSearch` | `getNearest(query, k)` | Главная векторная операция, отделена от CRUD |
 | `IPersistable` | `save`, `load`, `flush` | Отделяет работу с данными в RAM от записи/чтения с носителя. Персистентность можно подменить (файл, WAL) без смены API. |
 | `IIndex` | Индекс для k-NN: `add`, `remove`, `getNearest` | Сейчас `BruteForceIndex`; можно заменить на HNSW/LSH без смены API; один экземпляр на коллекцию |
-| `ICommandDispatcher` | `dispatch(List<String>)` | Текстовый протокол для REST (этап 3): `PUT docs id 1 2 3`, `SEARCH docs 1 2 3 5` |
+| `ICommandDispatcher` | `dispatch(List<String>)` | Текстовый протокол локальной консоли: `PUT docs id 1 2 3`, `SEARCH docs 1 2 3 5` |
 
 Для `IPersistable`:
 save() - записать текущее состояние БД (все коллекции) на диск
@@ -320,6 +369,7 @@ CollectionConfig images = CollectionConfig.of("images", 512, DistanceMetric.EUCL
 | `InMemoryVectorDBTest` | Коллекции (create/get/list/drop, изоляция, «мертвые» ссылки), сохранение и повторное открытие, сохранение при `close()`, удаление файлов при drop, `load()`, пропуск неизменённых коллекций, повреждённый и обрезанный файл, чужая `formatVersion`, автосохранение, закрытая БД |
 | `BruteForceIndexTest` | Порядок и `k`, равные расстояния, сверка с полной сортировкой на случайных данных для всех метрик |
 | `TextCommandDispatcherTest` | Сценарий команд от создания до удаления, ошибки синтаксиса, форматирование ответов |
+| `VectorDbRestApiTest` | REST CRUD и k-NN поиск, HTTP-коды ошибок, валидация и генерация OpenAPI |
 | `DistanceFunctionsTest` | Значения метрик и разная длина векторов |
 
 Новая реализация коллекции получает весь контракт, если унаследовать `VectorStoreContractTest` и реализовать `createStore(CollectionConfig)`.
@@ -331,28 +381,17 @@ CollectionConfig images = CollectionConfig.of("images", 512, DistanceMetric.EUCL
 
 См. раздел «Реализация (этап 2)» выше.
 
-### Этап 3 — REST
+### Этап 3 — REST ✅
 
 ```
-HttpServer / Spring Boot
-└── RestCommandDispatcher implements ICommandDispatcher
-    └── парсинг команд, вызовы IVectorDB
+Spring Boot / Tomcat (2222)
+├── DatabaseController
+├── CollectionController
+├── VectorController
+└── IVectorDB → ICollection
 ```
 
-Пример протокола. Имя коллекции передаётся явно в каждой команде (без состояния `USE`), т.к. REST stateless — аналог `/collections/{name}/points` в Qdrant:
-
-```
-CREATE_COLLECTION docs 3 COSINE
-LIST_COLLECTIONS
-DROP_COLLECTION docs
-
-PUT    docs vec-1  0.1 0.2 0.3
-GET    docs vec-1
-DELETE docs vec-1
-SEARCH docs 0.1 0.2 0.3  5
-STATS  [docs]
-SAVE
-```
+Контроллеры принимают JSON, выполняют валидацию и вызывают интерфейсы БД, реализованные во второй лабораторной. Документация контракта генерируется в OpenAPI, интерактивный клиент доступен через Swagger UI. Для развёртывания подготовлены `Dockerfile` и `compose.yaml`.
 
 ### Этап 4 — репликация
 
@@ -365,4 +404,3 @@ SAVE
 - Шард - отдельный экземпляр `IVectorDB` со своим `dataDirectory`; коллекция с одним именем существует на всех шардах с одинаковой схемой
 - Маршрутизация по hash(id) или по диапазону id или придумаем более умный кейс.
 - `ICommandDispatcher` на верхнем уровне направляет команду нужному шарду
-
