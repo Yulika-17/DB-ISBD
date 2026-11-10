@@ -1,0 +1,15 @@
+services:
+  vecdb:
+    build: .
+    ports:
+      - "2222:2222"
+    environment:
+      VECDB_NAME: vecdb
+      VECDB_AUTO_SAVE: "true"
+      VECDB_SAVE_INTERVAL: 5s
+    volumes:
+      - vecdb-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  vecdb-data:
