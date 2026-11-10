@@ -11,5 +11,5 @@ COPY --from=builder /workspace/target/lab-db-*.jar app.jar
 ENV SERVER_PORT=2222
 ENV VECDB_DATA_DIRECTORY=/app/data
 VOLUME /app/data
-EXPOSE 2222
+EXPOSE 2222 4700
 ENTRYPOINT ["java", "-jar", "app.jar"]

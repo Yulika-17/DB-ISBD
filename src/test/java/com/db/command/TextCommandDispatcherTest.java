@@ -9,6 +9,7 @@ import com.db.model.CollectionStats;
 import com.db.model.DbStats;
 import com.db.model.SearchResult;
 import com.db.model.VectorEntry;
+import com.db.replication.ReplicationStatus;
 import com.db.storage.InMemoryVectorDB;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,5 +105,13 @@ class TextCommandDispatcherTest {
         assertEquals("(empty)", ResponseFormatter.format(List.of()));
         assertEquals("docs (dimension=2, metric=COSINE, maxVectors=unlimited)",
                 ResponseFormatter.format(run("DESCRIBE docs")));
+    }
+
+    @Test
+    void statusWithoutReplicationIsStandalone() {
+        ReplicationStatus status = (ReplicationStatus) run("STATUS");
+        assertEquals("STANDALONE", status.role().name());
+        assertTrue(ResponseFormatter.format(status).contains("role=STANDALONE"));
+        assertThrows(IllegalArgumentException.class, () -> run("WAL DUMP 5"));
     }
 }

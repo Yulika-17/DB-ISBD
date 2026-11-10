@@ -7,6 +7,7 @@ import com.db.exception.DimensionMismatchException;
 import com.db.exception.IdNotFoundException;
 import com.db.exception.InvalidCollectionNameException;
 import com.db.exception.InvalidIdException;
+import com.db.exception.ReplicaReadOnlyException;
 import com.db.exception.StorageException;
 import com.db.rest.dto.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,6 +53,11 @@ public class RestExceptionHandler {
     @ExceptionHandler(CollectionAlreadyExistsException.class)
     ResponseEntity<ApiError> conflict(Exception exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(ReplicaReadOnlyException.class)
+    ResponseEntity<ApiError> replicaReadOnly(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.FORBIDDEN, exception.getMessage(), request);
     }
 
     @ExceptionHandler(DatabaseClosedException.class)

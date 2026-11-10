@@ -1,9 +1,11 @@
 package com.db;
 
+import com.db.api.IVectorDB;
 import com.db.command.ResponseFormatter;
 import com.db.command.TextCommandDispatcher;
 import com.db.config.DbConfig;
-import com.db.storage.InMemoryVectorDB;
+import com.db.config.NodeRole;
+import com.db.storage.VectorDBFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -19,6 +21,8 @@ import java.util.Locale;
  *
  * <pre>
  * java -cp target/classes com.db.Main [--data ./data] [--name vecdb] [--save-interval 5] [--no-autosave]
+ *     [--role master|replica] [--replication-port 4700] [--master-host 127.0.0.1] [--master-port 4700]
+ *     [--replication-delay-ms 0]
  * </pre>
  *
  * Команды читаются из stdin построчно (можно передать файл: {@code ... com.db.Main < script.txt}).
@@ -35,11 +39,13 @@ public final class Main {
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             System.err.println("usage: Main [--data DIR] [--name NAME] [--save-interval SECONDS] [--no-autosave]");
+            System.err.println("            [--role master|replica] [--replication-port PORT]");
+            System.err.println("            [--master-host HOST] [--master-port PORT] [--replication-delay-ms MS]");
             System.exit(2);
             return;
         }
 
-        InMemoryVectorDB db = InMemoryVectorDB.open(config);
+        IVectorDB db = VectorDBFactory.open(config);
         Thread hook = new Thread(db::close, "vecdb-shutdown");
         Runtime.getRuntime().addShutdownHook(hook);
 
@@ -47,6 +53,7 @@ public final class Main {
         boolean interactive = System.console() != null;
         System.out.println("vecDB '" + config.name() + "' — data: " + config.dataPath().toAbsolutePath().normalize()
                 + ", collections: " + db.listCollections().size()
+                + ", role=" + config.role()
                 + (config.autoSave() ? ", autosave every " + config.saveInterval().toSeconds() + "s" : ", autosave off"));
         System.out.println("Type HELP for commands, EXIT to quit.");
 
@@ -99,6 +106,11 @@ public final class Main {
                         throw new IllegalArgumentException("--save-interval expects seconds, got '" + v + "'");
                     }
                 }
+                case "--role" -> b.role(parseRole(value(args, ++i, "--role")));
+                case "--replication-port" -> b.replicationPort(parseInt(value(args, ++i, "--replication-port"), "--replication-port"));
+                case "--master-host" -> b.masterHost(value(args, ++i, "--master-host"));
+                case "--master-port" -> b.masterPort(parseInt(value(args, ++i, "--master-port"), "--master-port"));
+                case "--replication-delay-ms" -> b.replicationDelayMs(parseLong(value(args, ++i, "--replication-delay-ms"), "--replication-delay-ms"));
                 default -> throw new IllegalArgumentException("unknown option: " + args[i]);
             }
         }
@@ -110,5 +122,29 @@ public final class Main {
             throw new IllegalArgumentException(option + " requires a value");
         }
         return args[i];
+    }
+
+    private static NodeRole parseRole(String raw) {
+        try {
+            return NodeRole.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("--role expects standalone|master|replica, got '" + raw + "'");
+        }
+    }
+
+    private static int parseInt(String raw, String option) {
+        try {
+            return Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(option + " expects an integer, got '" + raw + "'");
+        }
+    }
+
+    private static long parseLong(String raw, String option) {
+        try {
+            return Long.parseLong(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(option + " expects an integer, got '" + raw + "'");
+        }
     }
 }

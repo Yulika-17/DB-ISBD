@@ -5,6 +5,7 @@ import com.db.model.CollectionStats;
 import com.db.model.DbStats;
 import com.db.model.SearchResult;
 import com.db.model.VectorEntry;
+import com.db.replication.ReplicationStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
@@ -38,6 +39,9 @@ public final class ResponseFormatter {
         }
         if (result instanceof DbStats s) {
             return dbStats(s);
+        }
+        if (result instanceof ReplicationStatus s) {
+            return s.toString();
         }
         if (result instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof SearchResult) {
             StringBuilder sb = new StringBuilder();
