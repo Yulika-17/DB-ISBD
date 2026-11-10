@@ -78,7 +78,7 @@ bye
 
 | Команда                                                                      | Описание                                                                           |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `CREATE_COLLECTION <name> <dim> [COSINE|EUCLIDEAN|DOT_PRODUCT] [maxVectors]` | Создать коллекцию                                                                  |
+| `CREATE_COLLECTION <name> <dim> [COSINE\|EUCLIDEAN\|DOT_PRODUCT] [maxVectors]` | Создать коллекцию                                                                  |
 | `DROP_COLLECTION <name>`                                                     | Удалить коллекцию вместе с файлами                                                 |
 | `LIST_COLLECTIONS`, `DESCRIBE <name>`                                        | Список коллекций / схема коллекции                                                 |
 | `PUT <coll> <id> <v1> … <vN> [payload…]`                                     | Вставить/перезаписать; N = размерность коллекции, остаток строки — payload (UTF-8) |
