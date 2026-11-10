@@ -126,6 +126,31 @@ public final class InMemoryVectorDB implements IVectorDB {
                 lastSaveAt, lastSaveDurationMs, per);
     }
 
+    /**
+     * Имитация падения процесса: потоки останавливаются, снимок на диск не пишется.
+     * WAL при этом уже должен быть сброшен вызывающей стороной.
+     */
+    public void abandonWithoutSave() {
+        if (closed) {
+            return;
+        }
+        shutdownAutosave();
+        saveLock.lock();
+        schemaLock.writeLock().lock();
+        try {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            for (InMemoryCollection c : collections.values()) {
+                c.markClosed(config.name());
+            }
+        } finally {
+            schemaLock.writeLock().unlock();
+            saveLock.unlock();
+        }
+    }
+
     /** Останавливает автосохранение, сохраняет изменения на диск. Повторный вызов ничего не делает. */
     @Override
     public void close() {

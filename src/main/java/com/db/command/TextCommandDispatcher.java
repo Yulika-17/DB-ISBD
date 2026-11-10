@@ -8,6 +8,9 @@ import com.db.config.DistanceMetric;
 import com.db.exception.IdNotFoundException;
 import com.db.exception.StorageException;
 import com.db.model.VectorEntry;
+import com.db.replication.IReplicationNode;
+import com.db.replication.ReplicationStatus;
+import com.db.replication.WalJson;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,12 +47,17 @@ public final class TextCommandDispatcher implements ICommandDispatcher {
               STATS  [collection]
               SAVE
               LOAD               (перечитать с диска, несохранённые изменения теряются)
+              STATUS
+              WAL DUMP [N]       (последние N записей журнала, по умолчанию 20)
+              PROMOTE            (ведомый становится ведущим)
               HELP""";
 
     private final IVectorDB db;
+    private final IReplicationNode replication;
 
     public TextCommandDispatcher(IVectorDB db) {
         this.db = Objects.requireNonNull(db, "db");
+        this.replication = db instanceof IReplicationNode node ? node : null;
     }
 
     @Override
@@ -82,7 +90,8 @@ public final class TextCommandDispatcher implements ICommandDispatcher {
             }
             case "DELETE" -> {
                 arity(args, 2, "DELETE <collection> <id>");
-                yield collection(args).delete(args.get(1));
+                boolean removed = collection(args).delete(args.get(1));
+                yield replication == null ? removed : removed + " lsn=" + replication.lastWriteLsn();
             }
             case "EXISTS" -> {
                 arity(args, 2, "EXISTS <collection> <id>");
@@ -95,7 +104,20 @@ public final class TextCommandDispatcher implements ICommandDispatcher {
             case "CLEAR" -> {
                 arity(args, 1, "CLEAR <collection>");
                 collection(args).clear();
-                yield "OK";
+                yield okWithLsn();
+            }
+            case "STATUS" -> {
+                arity(args, 0, "STATUS");
+                yield replication == null ? ReplicationStatus.standalone() : replication.replicationStatus();
+            }
+            case "WAL" -> walDump(args);
+            case "PROMOTE" -> {
+                arity(args, 0, "PROMOTE");
+                if (replication == null) {
+                    throw new IllegalArgumentException("replication is not enabled");
+                }
+                replication.promote();
+                yield replication.replicationStatus();
             }
             case "SEARCH" -> search(args);
             case "STATS" -> {
@@ -153,7 +175,26 @@ public final class TextCommandDispatcher implements ICommandDispatcher {
         List<String> rest = args.subList(2 + dim, args.size());
         byte[] payload = rest.isEmpty() ? null : String.join(" ", rest).getBytes(StandardCharsets.UTF_8);
         c.put(new VectorEntry(args.get(1), vector, payload));
-        return "OK";
+        return okWithLsn();
+    }
+
+    private Object walDump(List<String> args) {
+        if (args.isEmpty() || !args.get(0).equalsIgnoreCase("DUMP") || args.size() > 2) {
+            throw usage("WAL DUMP [N]");
+        }
+        if (replication == null) {
+            throw new IllegalArgumentException("WAL is not enabled (start with --role master|replica)");
+        }
+        int n = args.size() == 2 ? parseInt(args.get(1), "N") : 20;
+        if (n < 1) {
+            throw new IllegalArgumentException("N must be >= 1");
+        }
+        List<String> lines = replication.walDump(n).stream().map(WalJson::toJson).toList();
+        return lines.isEmpty() ? List.of("(empty WAL)") : lines;
+    }
+
+    private String okWithLsn() {
+        return replication == null ? "OK" : "OK lsn=" + replication.lastWriteLsn();
     }
 
     /** SEARCH coll v1..vN k */

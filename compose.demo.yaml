@@ -1,0 +1,41 @@
+# Кластер: 1 ведущий + 1 ведомый.
+# docker compose -f compose.demo.yaml up --build
+#
+# HTTP:  master :2222, replica :2223
+# TCP репликации: master:4700 внутри сети compose (с хоста не нужен)
+# Автосохранение выключено — демо восстановления идёт из WAL.
+
+services:
+  master:
+    build: .
+    ports:
+      - "2222:2222"
+    environment:
+      VECDB_NAME: master
+      VECDB_ROLE: MASTER
+      VECDB_REPLICATION_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    volumes:
+      - demo-master-data:/app/data
+
+  replica:
+    build: .
+    ports:
+      - "2223:2222"
+    environment:
+      VECDB_NAME: replica
+      VECDB_ROLE: REPLICA
+      VECDB_MASTER_HOST: master
+      VECDB_MASTER_PORT: "4700"
+      VECDB_REPLICATION_DELAY_MS: "2000"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    depends_on:
+      - master
+    volumes:
+      - demo-replica-data:/app/data
+
+volumes:
+  demo-master-data:
+  demo-replica-data:
