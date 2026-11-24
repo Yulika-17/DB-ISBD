@@ -1,0 +1,103 @@
+# Distributed sharding demo: HTTP master/router + independent shard primaries and WAL replicas.
+# Start with: docker compose -f compose.sharding.demo.yaml up --build -d
+services:
+  master:
+    image: python:3.12-alpine
+    command: ["python", "-u", "/app/shard-router.py"]
+    ports:
+      - "2222:2222"
+    environment:
+      VIRTUAL_NODES: "128"
+      SHARD_NODES: "${SHARD_NODES:-shard-0=http://shard0-primary:2222|http://shard0-replica:2222,shard-1=http://shard1-primary:2222|http://shard1-replica:2222}"
+    volumes:
+      - ./scripts/shard-router.py:/app/shard-router.py:ro
+    depends_on:
+      - shard0-primary
+      - shard0-replica
+      - shard1-primary
+      - shard1-replica
+
+  shard0-primary:
+    build: .
+    environment: &shard0-master-env
+      VECDB_NAME: shard-0-primary
+      VECDB_ROLE: MASTER
+      VECDB_REPLICATION_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    volumes:
+      - demo-shard0-primary-data:/app/data
+
+  shard0-replica:
+    build: .
+    environment:
+      VECDB_NAME: shard-0-replica
+      VECDB_ROLE: REPLICA
+      VECDB_MASTER_HOST: shard0-primary
+      VECDB_MASTER_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    depends_on:
+      - shard0-primary
+    volumes:
+      - demo-shard0-replica-data:/app/data
+
+  shard1-primary:
+    build: .
+    environment:
+      VECDB_NAME: shard-1-primary
+      VECDB_ROLE: MASTER
+      VECDB_REPLICATION_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    volumes:
+      - demo-shard1-primary-data:/app/data
+
+  shard1-replica:
+    build: .
+    environment:
+      VECDB_NAME: shard-1-replica
+      VECDB_ROLE: REPLICA
+      VECDB_MASTER_HOST: shard1-primary
+      VECDB_MASTER_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    depends_on:
+      - shard1-primary
+    volumes:
+      - demo-shard1-replica-data:/app/data
+
+  shard2-primary:
+    profiles: [expanded]
+    build: .
+    environment:
+      VECDB_NAME: shard-2-primary
+      VECDB_ROLE: MASTER
+      VECDB_REPLICATION_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    volumes:
+      - demo-shard2-primary-data:/app/data
+
+  shard2-replica:
+    profiles: [expanded]
+    build: .
+    environment:
+      VECDB_NAME: shard-2-replica
+      VECDB_ROLE: REPLICA
+      VECDB_MASTER_HOST: shard2-primary
+      VECDB_MASTER_PORT: "4700"
+      VECDB_AUTO_SAVE: "false"
+      VECDB_DATA_DIRECTORY: /app/data
+    depends_on:
+      - shard2-primary
+    volumes:
+      - demo-shard2-replica-data:/app/data
+
+volumes:
+  demo-shard0-primary-data:
+  demo-shard0-replica-data:
+  demo-shard1-primary-data:
+  demo-shard1-replica-data:
+  demo-shard2-primary-data:
+  demo-shard2-replica-data:

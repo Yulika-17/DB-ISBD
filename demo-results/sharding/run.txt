@@ -1,0 +1,9 @@
+Демонстрация распределённого шардирования
+Начало: 2026-11-24T19:57:24+03:00
+Compose-файл: compose.sharding.demo.yaml
+
+
+Окончание: 2026-11-24T19:57:46+03:00
+Результаты: /home/maria/DB-ISBD/demo-results/sharding
+Кластер оставлен запущенным, выбранный primary остановлен. Для очистки выполните:
+  docker compose -f compose.sharding.demo.yaml --profile expanded down -v
