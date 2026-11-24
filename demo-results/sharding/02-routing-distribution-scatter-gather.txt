@@ -1,0 +1,46 @@
+
+== Фаза 1. Создаём схему и записываем 120 векторов с разными ID ==
+HTTP/1.1 201 Created
+Server: BaseHTTP/0.6 Python/3.12.16
+Date: Tue, 24 Nov 2026 16:57:33 GMT
+Content-Type: application/json
+Content-Length: 68
+X-VecDB-Shards-Queried: shard-0,shard-1
+X-VecDB-Scatter-Gather: true
+
+{"name":"shard-demo","dimension":3,"metric":"COSINE","maxVectors":0}Записано 120 векторов: demo-001 — demo-120.
+
+== Фаза 2. Точечный GET маршрутизируется ровно на один shard ==
+GET ключа demo-050; владелец по кольцу: shard-1
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.12.16
+Date: Tue, 24 Nov 2026 16:57:35 GMT
+Content-Type: application/json
+Content-Length: 63
+X-VecDB-Shard: shard-1
+X-VecDB-Node: primary
+
+{"id":"demo-050","vector":[0.0,0.0,1.0],"data":null,"lsn":null}
+
+== Фаза 3. Распределение ключей по шардам ==
+shard-0: 61 ключей из 120 (50.8%)
+shard-1: 59 ключей из 120 (49.2%)
+
+== Фаза 4. У k-NN запроса нет ключа шарда, поэтому он опрашивает все шарды ==
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.12.16
+Date: Tue, 24 Nov 2026 16:57:35 GMT
+Content-Type: application/json
+Content-Length: 510
+X-VecDB-Shards-Queried: shard-0,shard-1
+X-VecDB-Scatter-Gather: true
+
+[
+    {"entry": {"id": "demo-006", "vector": [1.0, 0.0, 0.0], "data": null, "lsn": null}, "distance": 0.0}, 
+    {"entry": {"id": "demo-009", "vector": [1.0, 0.0, 0.0], "data": null, "lsn": null}, "distance": 0.0}, 
+    {"entry": {"id": "demo-012", "vector": [1.0, 0.0, 0.0], "data": null, "lsn": null}, "distance": 0.0}, 
+    {"entry": {"id": "demo-015", "vector": [1.0, 0.0, 0.0], "data": null, "lsn": null}, "distance": 0.0}, 
+    {"entry": {"id": "demo-018", "vector": [1.0, 0.0, 0.0], "data": null, "lsn": null}, "distance": 0.0}
+]
+
+Заголовки X-VecDB-Shards-Queried и X-VecDB-Scatter-Gather показывают веерный запрос.

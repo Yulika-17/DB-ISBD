@@ -1,0 +1,23 @@
+
+== Определяем shard ключа, его primary и реплику ==
+Ключ: demo-001
+Shard: shard-1
+Primary: http://shard1-primary:2222
+Реплика: http://shard1-replica:2222
+
+== Ждём, пока реплика применит актуальный WAL primary ==
+Состояние primary: {"role":"MASTER","lastLsn":76,"lastAppliedLsn":76,"masterLsn":76,"lag":0,"replicationPort":4700,"replicationDelayMs":0}
+Состояние реплики: {"role":"REPLICA","lastLsn":76,"lastAppliedLsn":76,"masterLsn":76,"lag":0,"replicationPort":0,"replicationDelayMs":0}
+
+== Останавливаем primary и читаем тот же ключ через мастер ==
+ Container db-isbd-shard1-primary-1  Stopping
+ Container db-isbd-shard1-primary-1  Stopped
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.6 Python/3.12.16
+Date: Tue, 24 Nov 2026 16:57:46 GMT
+Content-Type: application/json
+Content-Length: 63
+X-VecDB-Shard: shard-1
+X-VecDB-Node: replica
+
+{"id":"demo-001","vector":[0.0,1.0,0.0],"data":null,"lsn":null}

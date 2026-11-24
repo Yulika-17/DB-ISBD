@@ -202,6 +202,17 @@ public final class InMemoryCollection implements ICollection {
         }
     }
 
+    @Override
+    public List<VectorEntry> entries() {
+        lock.readLock().lock();
+        try {
+            ensureAlive();
+            return storage.values().stream().map(InMemoryCollection::copyOf).toList();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     // ------------------------------------------- пакетный API для InMemoryVectorDB
 
     /** Номер версии данных; меняется при каждом изменении. */

@@ -1,0 +1,157 @@
+
+== Сборка и запуск мастера, двух шардов и двух реплик ==
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.83kB done
+#1 DONE 0.0s
+
+#2 [shard1-replica internal] load build definition from Dockerfile
+#2 transferring dockerfile: 441B done
+#2 DONE 0.0s
+
+#3 [shard0-replica internal] load metadata for mcr.microsoft.com/openjdk/jdk:21-ubuntu
+#3 DONE 0.1s
+
+#4 [shard0-replica internal] load .dockerignore
+#4 transferring context: 75B done
+#4 DONE 0.0s
+
+#5 [shard1-replica builder 1/6] FROM mcr.microsoft.com/openjdk/jdk:21-ubuntu@sha256:72f64c1ce780c7436c238822d9df2908d76b080910cb8dae7db3a0962df9307c
+#5 resolve mcr.microsoft.com/openjdk/jdk:21-ubuntu@sha256:72f64c1ce780c7436c238822d9df2908d76b080910cb8dae7db3a0962df9307c 0.0s done
+#5 DONE 0.0s
+
+#6 [shard1-replica internal] load build context
+#6 transferring context: 6.69kB 0.0s done
+#6 DONE 0.0s
+
+#7 [shard0-primary builder 2/6] WORKDIR /workspace
+#7 CACHED
+
+#8 [shard0-primary builder 3/6] COPY .mvn .mvn
+#8 CACHED
+
+#9 [shard0-primary builder 4/6] COPY mvnw pom.xml ./
+#9 CACHED
+
+#10 [shard0-primary builder 5/6] COPY src src
+#10 CACHED
+
+#11 [shard0-primary builder 6/6] RUN ./mvnw package -DskipTests
+#11 CACHED
+
+#12 [shard0-primary stage-1 2/3] WORKDIR /app
+#12 CACHED
+
+#13 [shard0-primary stage-1 3/3] COPY --from=builder /workspace/target/lab-db-*.jar app.jar
+#13 CACHED
+
+#14 [shard0-primary] exporting to image
+#14 exporting layers done
+#14 exporting manifest sha256:9e415c6b69f05cc5b5744d7573142dacde2637b2b0473bab6adeb94ea672f0d2 0.0s done
+#14 exporting config sha256:19ead139667ab1157860c618dc08be6b213c13401b408910bc5dc76520b0bbd8 0.0s done
+#14 exporting attestation manifest sha256:da97992651bc9a2d51b230f0850d78248686742885d348ca282a6009713f9d43
+#14 exporting attestation manifest sha256:da97992651bc9a2d51b230f0850d78248686742885d348ca282a6009713f9d43 0.2s done
+#14 exporting manifest list sha256:288b7fa99c7b27710441dfe8149bedf0aed1ee215e6b7fe78d10c29213e61215 0.1s done
+#14 naming to docker.io/library/db-isbd-shard0-primary:latest
+#14 naming to docker.io/library/db-isbd-shard0-primary:latest 0.0s done
+#14 unpacking to docker.io/library/db-isbd-shard0-primary:latest 0.0s done
+#14 DONE 0.4s
+
+#15 [shard0-replica] exporting to image
+#15 exporting layers done
+#15 exporting manifest sha256:3a2b5887eb058b760a88eb2bd6a3a905bf85effc55191367935719ef53a3a0f9 done
+#15 exporting config sha256:42d7abc118dde5005a6002025843e3336aa1b691c10e54c7d3a4f8851ee24892 0.0s done
+#15 exporting attestation manifest sha256:b8bc760bb4c41cba5682c0daf4bbaad3b8d2daaf43c3eeaa799e77459316f62a 0.2s done
+#15 exporting manifest list sha256:9fa3f233339069f215d12bcbbcd9ee41a81067288447a155ae27c580bee95f7e 0.1s done
+#15 naming to docker.io/library/db-isbd-shard0-replica:latest 0.0s done
+#15 unpacking to docker.io/library/db-isbd-shard0-replica:latest 0.0s done
+#15 DONE 0.4s
+
+#16 [shard1-replica] exporting to image
+#16 exporting layers done
+#16 exporting manifest sha256:9f4f4175a24e90a1b88c069dc30132448f2771b628622b1630df9e9e2ce8b594 0.0s done
+#16 exporting config sha256:7ef7f212e7400fbf18dcff336968b9b5b6334cc74f14065d5c3f64fd4f56cddb 0.0s done
+#16 exporting attestation manifest sha256:fc5b3e7ac94f8ac4ee6b85e67294382ac363a14cea9de2dd43550548c0d1ac41 0.1s done
+#16 exporting manifest list sha256:799181c3fe50cf04c3746563bac1f03da52a67240db49299154afb3f438344ad 0.1s done
+#16 naming to docker.io/library/db-isbd-shard1-replica:latest 0.0s done
+#16 unpacking to docker.io/library/db-isbd-shard1-replica:latest 0.0s done
+#16 DONE 0.4s
+
+#17 [shard1-primary] exporting to image
+#17 exporting layers done
+#17 exporting manifest sha256:ca2f3d616c6c75dedd89e5565104e877854f534842b0f09a02d1f821fc96142f 0.0s done
+#17 exporting config sha256:7f04c792d86d05fb39df9a53248ae48d853d7d4cad64294885d08c6cbc6adc4b 0.0s done
+#17 exporting attestation manifest sha256:07f6642a1fb690ac0a93d807a83591a80f52d5a094f1c11c28c3c7071f9fb86d 0.1s done
+#17 exporting manifest list sha256:c3afd1ca1e3aef3c149f56bfb2097625705f8bf6b0e1811a4b1dbdcd5f6466c6 0.1s done
+#17 naming to docker.io/library/db-isbd-shard1-primary:latest 0.0s done
+#17 unpacking to docker.io/library/db-isbd-shard1-primary:latest 0.0s done
+#17 DONE 0.4s
+
+#18 [shard0-replica] resolving provenance for metadata file
+#18 ...
+
+#19 [shard0-primary] resolving provenance for metadata file
+#19 DONE 0.1s
+
+#18 [shard0-replica] resolving provenance for metadata file
+#18 DONE 0.1s
+
+#20 [shard1-replica] resolving provenance for metadata file
+#20 DONE 0.1s
+
+#21 [shard1-primary] resolving provenance for metadata file
+#21 DONE 0.0s
+ db-isbd-shard0-primary  Built
+ db-isbd-shard0-replica  Built
+ db-isbd-shard1-primary  Built
+ db-isbd-shard1-replica  Built
+ Network db-isbd_default  Creating
+ Network db-isbd_default  Created
+ Volume db-isbd_demo-shard0-replica-data  Creating
+ Volume db-isbd_demo-shard0-replica-data  Created
+ Volume db-isbd_demo-shard1-primary-data  Creating
+ Volume db-isbd_demo-shard1-primary-data  Created
+ Volume db-isbd_demo-shard1-replica-data  Creating
+ Volume db-isbd_demo-shard1-replica-data  Created
+ Volume db-isbd_demo-shard0-primary-data  Creating
+ Volume db-isbd_demo-shard0-primary-data  Created
+ Container db-isbd-shard0-primary-1  Creating
+ Container db-isbd-shard1-primary-1  Creating
+ Container db-isbd-shard0-primary-1  Created
+ Container db-isbd-shard0-replica-1  Creating
+ Container db-isbd-shard1-primary-1  Created
+ Container db-isbd-shard1-replica-1  Creating
+ Container db-isbd-shard1-replica-1  Created
+ Container db-isbd-shard0-replica-1  Created
+ Container db-isbd-master-1  Creating
+ Container db-isbd-master-1  Created
+ Container db-isbd-shard0-primary-1  Starting
+ Container db-isbd-shard1-primary-1  Starting
+ Container db-isbd-shard1-primary-1  Started
+ Container db-isbd-shard1-replica-1  Starting
+ Container db-isbd-shard0-primary-1  Started
+ Container db-isbd-shard0-replica-1  Starting
+ Container db-isbd-shard1-replica-1  Started
+ Container db-isbd-shard0-replica-1  Started
+ Container db-isbd-master-1  Starting
+ Container db-isbd-master-1  Started
+NAME                       IMAGE                    COMMAND                  SERVICE          CREATED         STATUS         PORTS
+db-isbd-master-1           python:3.12-alpine       "python -u /app/shar…"   master           7 seconds ago   Up 4 seconds   0.0.0.0:2222->2222/tcp, [::]:2222->2222/tcp
+db-isbd-shard0-primary-1   db-isbd-shard0-primary   "java -jar app.jar"      shard0-primary   7 seconds ago   Up 6 seconds   2222/tcp, 4700/tcp
+db-isbd-shard0-replica-1   db-isbd-shard0-replica   "java -jar app.jar"      shard0-replica   7 seconds ago   Up 5 seconds   2222/tcp, 4700/tcp
+db-isbd-shard1-primary-1   db-isbd-shard1-primary   "java -jar app.jar"      shard1-primary   7 seconds ago   Up 6 seconds   2222/tcp, 4700/tcp
+db-isbd-shard1-replica-1   db-isbd-shard1-replica   "java -jar app.jar"      shard1-replica   7 seconds ago   Up 5 seconds   2222/tcp, 4700/tcp
+
+== Кольцо consistent hashing и виртуальные узлы ==
+Шарды: shard-0, shard-1
+Виртуальных узлов на shard: 128
+Всего точек на кольце: 256
+shard-0: токенов 128; примеры: -8738782454194930885, -8639176703147339165, -8628267472253236876, -8607864384831492627, -8111311964758192284
+shard-1: токенов 128; примеры: -9098386720956775539, -9053876509535004277, -9043913396171436034, -8652489910696255109, -8623438567176628761
+
+== Контейнеры Docker ==
+NAME                       IMAGE                    COMMAND                  SERVICE          CREATED         STATUS         PORTS
+db-isbd-master-1           python:3.12-alpine       "python -u /app/shar…"   master           7 seconds ago   Up 4 seconds   0.0.0.0:2222->2222/tcp, [::]:2222->2222/tcp
+db-isbd-shard0-primary-1   db-isbd-shard0-primary   "java -jar app.jar"      shard0-primary   7 seconds ago   Up 6 seconds   2222/tcp, 4700/tcp
+db-isbd-shard0-replica-1   db-isbd-shard0-replica   "java -jar app.jar"      shard0-replica   7 seconds ago   Up 5 seconds   2222/tcp, 4700/tcp
+db-isbd-shard1-primary-1   db-isbd-shard1-primary   "java -jar app.jar"      shard1-primary   7 seconds ago   Up 6 seconds   2222/tcp, 4700/tcp
+db-isbd-shard1-replica-1   db-isbd-shard1-replica   "java -jar app.jar"      shard1-replica   7 seconds ago   Up 5 seconds   2222/tcp, 4700/tcp

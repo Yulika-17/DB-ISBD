@@ -486,5 +486,10 @@ public final class ReplicatedVectorDB implements IVectorDB, IReplicationNode {
         public com.db.model.CollectionStats stats() {
             return delegate.stats();
         }
+
+        @Override
+        public List<VectorEntry> entries() {
+            return delegate.entries();
+        }
     }
 }
