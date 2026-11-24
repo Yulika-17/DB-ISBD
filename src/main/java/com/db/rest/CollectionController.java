@@ -5,6 +5,7 @@ import com.db.api.IVectorDB;
 import com.db.config.CollectionConfig;
 import com.db.exception.CollectionNotFoundException;
 import com.db.model.CollectionStats;
+import com.db.replication.IReplicationNode;
 import com.db.rest.dto.CollectionResponse;
 import com.db.rest.dto.CreateCollectionRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,8 +44,11 @@ public class CollectionController {
                 request.maxVectors()
         );
         ICollection collection = database.createCollection(config);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(CollectionResponse.from(collection.config()));
+        ResponseEntity.BodyBuilder created = ResponseEntity.status(HttpStatus.CREATED);
+        if (database instanceof IReplicationNode node) {
+            created.header("X-VecDB-LSN", Long.toString(node.lastWriteLsn()));
+        }
+        return created.body(CollectionResponse.from(collection.config()));
     }
 
     @GetMapping
@@ -75,6 +79,10 @@ public class CollectionController {
         if (!database.dropCollection(name)) {
             throw new CollectionNotFoundException(name);
         }
-        return ResponseEntity.noContent().build();
+        ResponseEntity.HeadersBuilder<?> gone = ResponseEntity.noContent();
+        if (database instanceof IReplicationNode node && node.lastWriteLsn() > 0) {
+            gone.header("X-VecDB-LSN", Long.toString(node.lastWriteLsn()));
+        }
+        return gone.build();
     }
 }

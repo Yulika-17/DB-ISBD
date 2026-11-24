@@ -112,5 +112,9 @@ class VectorDbRestApiTest {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("Vector database REST API"));
+
+        mvc.perform(get("/api/v1/replication/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("STANDALONE"));
     }
 }
